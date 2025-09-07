@@ -2,15 +2,15 @@
 
 import { useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { TrendingUp, Car } from 'lucide-react';
+import { TrendingUp, Car, Siren } from 'lucide-react';
 import Dashboard from '@/components/dashboard';
 import type { SimulationMetrics } from '@/lib/types';
 import { DashboardControls } from '@/components/dashboard-controls';
 
 export default function ComparisonDashboard() {
   const [isSimulating, setIsSimulating] = useState(false);
-  const [adaptiveMetrics, setAdaptiveMetrics] = useState<SimulationMetrics>({ totalVehicles: 0, cycleCount: 0 });
-  const [fixedMetrics, setFixedMetrics] = useState<SimulationMetrics>({ totalVehicles: 0, cycleCount: 0 });
+  const [adaptiveMetrics, setAdaptiveMetrics] = useState<SimulationMetrics>({ totalVehicles: 0, cycleCount: 0, emergencyVehicles: 0 });
+  const [fixedMetrics, setFixedMetrics] = useState<SimulationMetrics>({ totalVehicles: 0, cycleCount: 0, emergencyVehicles: 0 });
 
   const handleStart = () => setIsSimulating(true);
   const handleStop = () => setIsSimulating(false);
@@ -66,15 +66,31 @@ export default function ComparisonDashboard() {
             <p className="text-xs text-muted-foreground">
                 After {cycleCount} cycles, the adaptive system has processed {adaptiveMetrics.totalVehicles.toFixed(0)} vehicles compared to the fixed system's {fixedMetrics.totalVehicles.toFixed(0)}.
             </p>
-            <div className="flex items-center pt-2">
-                <Car className="h-4 w-4 text-muted-foreground mr-2" />
-                <span className="text-sm font-medium">Total Vehicles Processed (Adaptive): </span>
-                <span className="text-sm font-bold ml-auto">{adaptiveMetrics.totalVehicles.toFixed(0)}</span>
-            </div>
-            <div className="flex items-center">
-                <Car className="h-4 w-4 text-muted-foreground mr-2" />
-                <span className="text-sm font-medium">Total Vehicles Processed (Fixed): </span>
-                <span className="text-sm font-bold ml-auto">{fixedMetrics.totalVehicles.toFixed(0)}</span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4 pt-2">
+              <div className="space-y-2">
+                <div className="flex items-center">
+                    <Car className="h-4 w-4 text-muted-foreground mr-2" />
+                    <span className="text-sm font-medium">Total Vehicles (Adaptive): </span>
+                    <span className="text-sm font-bold ml-auto">{adaptiveMetrics.totalVehicles.toFixed(0)}</span>
+                </div>
+                <div className="flex items-center">
+                    <Car className="h-4 w-4 text-muted-foreground mr-2" />
+                    <span className="text-sm font-medium">Total Vehicles (Fixed): </span>
+                    <span className="text-sm font-bold ml-auto">{fixedMetrics.totalVehicles.toFixed(0)}</span>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center">
+                    <Siren className="h-4 w-4 text-muted-foreground mr-2" />
+                    <span className="text-sm font-medium">Emergency Vehicles (Adaptive): </span>
+                    <span className="text-sm font-bold ml-auto">{adaptiveMetrics.emergencyVehicles.toFixed(0)}</span>
+                </div>
+                <div className="flex items-center">
+                    <Siren className="h-4 w-4 text-muted-foreground mr-2" />
+                    <span className="text-sm font-medium">Emergency Vehicles (Fixed): </span>
+                    <span className="text-sm font-bold ml-auto">{fixedMetrics.emergencyVehicles.toFixed(0)}</span>
+                </div>
+              </div>
             </div>
         </CardContent>
       </Card>

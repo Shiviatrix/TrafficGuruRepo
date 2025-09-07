@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { TrafficCard } from '@/components/traffic-card';
 import * as CONSTANTS from '@/lib/constants';
-import type { SimulationState, DashboardProps, VehicleThroughput } from '@/lib/types';
+import type { SimulationState, DashboardProps, VehicleThroughput, EmergencyVehicleThroughput } from '@/lib/types';
 import { calculateDelta, type CalculateDeltaInput } from '@/ai/flows/calculate-delta';
 import { explainDecisionReasoning, type ExplainDecisionReasoningInput } from '@/ai/flows/explain-decision-reasoning';
 import { useToast } from "@/hooks/use-toast"
@@ -13,15 +13,18 @@ export default function Dashboard({ mode, onMetricsUpdate, isSimulating }: Dashb
   const cycleTimeout = useRef<NodeJS.Timeout | null>(null);
   const uiInterval = useRef<NodeJS.Timeout | null>(null);
   const throughput = useRef<VehicleThroughput>({ NS: 0, EW: 0 });
+  const emergencyThroughput = useRef<EmergencyVehicleThroughput>({ NS: 0, EW: 0 });
   const { toast } = useToast();
 
   const handleReset = () => {
     throughput.current = { NS: 0, EW: 0 };
+    emergencyThroughput.current = { NS: 0, EW: 0 };
     setSimState(CONSTANTS.INITIAL_SIMULATION_STATE)
     if (onMetricsUpdate) {
       onMetricsUpdate({
         totalVehicles: 0,
         cycleCount: 0,
+        emergencyVehicles: 0,
       });
     }
   };
@@ -45,6 +48,10 @@ export default function Dashboard({ mode, onMetricsUpdate, isSimulating }: Dashb
                 const dischargedVehicles = Math.max(0, (duration - CONSTANTS.STARTUP_LOST_S) * (CONSTANTS.LANES_PER_APPROACH / CONSTANTS.HEADWAY_S));
                 throughput.current[groupName] += dischargedVehicles;
                 group.queue = Math.max(0, group.queue - dischargedVehicles);
+
+                if (group.emergency) {
+                  emergencyThroughput.current[groupName] += 1;
+                }
             }
             group.queue += (group.count / 60) * duration;
         }
@@ -154,6 +161,7 @@ export default function Dashboard({ mode, onMetricsUpdate, isSimulating }: Dashb
           onMetricsUpdate({
             totalVehicles: throughput.current.NS + throughput.current.EW,
             cycleCount: currentState.cycleCount + 1,
+            emergencyVehicles: emergencyThroughput.current.NS + emergencyThroughput.current.EW,
           });
         }
       }

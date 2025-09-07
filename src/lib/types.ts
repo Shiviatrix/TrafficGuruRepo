@@ -32,9 +32,15 @@ export interface VehicleThroughput {
   EW: number;
 }
 
+export interface EmergencyVehicleThroughput {
+  NS: number;
+  EW: number;
+}
+
 export interface SimulationMetrics {
   totalVehicles: number;
   cycleCount: number;
+  emergencyVehicles: number;
 }
 
 export interface DashboardProps {

@@ -1,26 +1,26 @@
 import type { SimulationState } from './types';
 
 // Core simulation parameters
-export const BASE_GREEN_S = 40;
+export const BASE_GREEN_S = 30;
 export const YELLOW_S = 3;
-export const MAX_ADJUST_S = 15;
-export const EMERGENCY_BONUS_S = 10;
+export const MAX_ADJUST_S = 20;
+export const EMERGENCY_BONUS_S = 15;
 export const MIN_GREEN_BASE_S = 10;
 export const MIN_GREEN_EMERG_S = 7;
 export const UI_UPDATE_INTERVAL_MS = 200;
 
 // Delta calculation coefficients
-export const ALPHA_PER_MEAN = 0.8;
-export const BETA_PER_WEIGHT = 0.5;
+export const ALPHA_PER_MEAN = 1.0;
+export const BETA_PER_WEIGHT = 0.6;
 
 // Traffic evolution rules
 export const HEADWAY_S = 1.9; // Time between vehicles clearing intersection
 export const STARTUP_LOST_S = 2.0; // Initial delay for first car
 export const LANES_PER_APPROACH = 2;
-export const ARRIVAL_JITTER = 0.1; // +/- 10%
+export const ARRIVAL_JITTER = 0.15; // +/- 15%
 export const WEIGHT_JITTER = 0.1; // +/- 10%
 export const EMERG_DECAY_P = 0.6; // 60% chance emergency clears
-export const EMERG_SPAWN_P = 0.04; // 4% chance new emergency appears
+export const EMERG_SPAWN_P = 0.05; // 5% chance new emergency appears
 export const MEAN_UPDATE_FACTOR = 0.1; // Weight for new queue pressure in mean calculation
 
 // Initial state for the simulation, mimicking traffic_gen.py
