@@ -2,19 +2,29 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { TrafficCard } from '@/components/traffic-card';
-import { DashboardControls } from '@/components/dashboard-controls';
 import * as CONSTANTS from '@/lib/constants';
 import type { SimulationState, DashboardProps, VehicleThroughput } from '@/lib/types';
 import { calculateDelta, type CalculateDeltaInput } from '@/ai/flows/calculate-delta';
 import { explainDecisionReasoning, type ExplainDecisionReasoningInput } from '@/ai/flows/explain-decision-reasoning';
 import { useToast } from "@/hooks/use-toast"
 
-export default function Dashboard({ mode, onMetricsUpdate }: DashboardProps) {
-  const [simState, setSimState] = useState<SimulationState>(CONSTANTS.INITIAL_SIMULATION_STATE);
+export default function Dashboard({ mode, onMetricsUpdate, isSimulating }: DashboardProps) {
+  const [simState, setSimState] = useState<SimulationState>({...CONSTANTS.INITIAL_SIMULATION_STATE});
   const cycleTimeout = useRef<NodeJS.Timeout | null>(null);
   const uiInterval = useRef<NodeJS.Timeout | null>(null);
   const throughput = useRef<VehicleThroughput>({ NS: 0, EW: 0 });
   const { toast } = useToast();
+
+  const handleReset = () => {
+    throughput.current = { NS: 0, EW: 0 };
+    setSimState(CONSTANTS.INITIAL_SIMULATION_STATE)
+    if (onMetricsUpdate) {
+      onMetricsUpdate({
+        totalVehicles: 0,
+        cycleCount: 0,
+      });
+    }
+  };
 
   const runSimulationCycle = async (currentState: SimulationState) => {
     try {
@@ -136,25 +146,13 @@ export default function Dashboard({ mode, onMetricsUpdate }: DashboardProps) {
           title: "Simulation Error",
           description: "An error occurred during the simulation cycle. Check the console for details.",
         })
-        handleStop();
-    }
-  };
-
-  const handleStart = () => setSimState(s => ({ ...s, isSimulating: true }));
-  const handleStop = () => setSimState(s => ({ ...s, isSimulating: false }));
-  const handleReset = () => {
-    throughput.current = { NS: 0, EW: 0 };
-    setSimState(CONSTANTS.INITIAL_SIMULATION_STATE)
-    if (onMetricsUpdate) {
-      onMetricsUpdate({
-        totalVehicles: 0,
-        cycleCount: 0,
-      });
+        if (cycleTimeout.current) clearTimeout(cycleTimeout.current);
+        if (uiInterval.current) clearInterval(uiInterval.current);
     }
   };
 
   useEffect(() => {
-    if (simState.isSimulating) {
+    if (isSimulating) {
       // Main simulation cycle trigger
       const cycleDurationMs = simState.timer * 1000;
       cycleTimeout.current = setTimeout(() => runSimulationCycle(simState), cycleDurationMs > 0 ? cycleDurationMs : 1000);
@@ -162,7 +160,7 @@ export default function Dashboard({ mode, onMetricsUpdate }: DashboardProps) {
       // UI countdown timer
       uiInterval.current = setInterval(() => {
         setSimState(s => {
-          if (!s.isSimulating) return s;
+          if (!isSimulating) return s;
           const newTime = s.timer - (CONSTANTS.UI_UPDATE_INTERVAL_MS / 1000);
           const cycleDuration = s.activeGroup === 'NS' ? s.ns_green_s : s.ew_green_s;
           return {
@@ -176,24 +174,22 @@ export default function Dashboard({ mode, onMetricsUpdate }: DashboardProps) {
     } else {
         if (cycleTimeout.current) clearTimeout(cycleTimeout.current);
         if (uiInterval.current) clearInterval(uiInterval.current);
+        // Reset if simulation is stopped
+        if (simState.cycleCount > 0) {
+            handleReset();
+        }
     }
 
     return () => {
       if (cycleTimeout.current) clearTimeout(cycleTimeout.current);
       if (uiInterval.current) clearInterval(uiInterval.current);
     };
-  }, [simState.isSimulating, simState.cycleCount]);
+  }, [isSimulating, simState.cycleCount]);
 
 
   return (
     <div className="space-y-8">
-      <DashboardControls
-        isSimulating={simState.isSimulating}
-        onStart={handleStart}
-        onStop={handleStop}
-        onReset={handleReset}
-      />
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         <TrafficCard
           title="North-South"
           status={simState.activeGroup === 'NS' ? 'GREEN' : 'RED'}
@@ -201,7 +197,7 @@ export default function Dashboard({ mode, onMetricsUpdate }: DashboardProps) {
           progress={simState.activeGroup === 'NS' ? simState.progress : 100}
           sensorData={simState.groups.NS}
           delta={mode === 'adaptive' && simState.activeGroup === 'NS' ? simState.delta_used_s : undefined}
-          explanation={simState.isSimulating && simState.activeGroup === 'NS' ? simState.explanation : 'Waiting for phase...'}
+          explanation={isSimulating ? simState.explanation : 'Waiting for phase...'}
         />
         <TrafficCard
           title="East-West"
@@ -210,7 +206,7 @@ export default function Dashboard({ mode, onMetricsUpdate }: DashboardProps) {
           progress={simState.activeGroup === 'EW' ? simState.progress : 100}
           sensorData={simState.groups.EW}
           delta={mode === 'adaptive' && simState.activeGroup === 'EW' ? simState.delta_used_s : undefined}
-          explanation={simState.isSimulating && simState.activeGroup === 'EW' ? simState.explanation : 'Waiting for phase...'}
+          explanation={isSimulating ? simState.explanation : 'Waiting for phase...'}
         />
       </div>
     </div>

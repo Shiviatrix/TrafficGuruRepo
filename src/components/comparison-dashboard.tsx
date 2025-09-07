@@ -1,15 +1,24 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TrendingUp, Car } from 'lucide-react';
 import Dashboard from '@/components/dashboard';
 import type { SimulationMetrics } from '@/lib/types';
+import { DashboardControls } from '@/components/dashboard-controls';
 
 export default function ComparisonDashboard() {
+  const [isSimulating, setIsSimulating] = useState(false);
   const [adaptiveMetrics, setAdaptiveMetrics] = useState<SimulationMetrics>({ totalVehicles: 0, cycleCount: 0 });
   const [fixedMetrics, setFixedMetrics] = useState<SimulationMetrics>({ totalVehicles: 0, cycleCount: 0 });
+
+  const handleStart = () => setIsSimulating(true);
+  const handleStop = () => setIsSimulating(false);
+  const handleReset = () => {
+    setIsSimulating(false);
+    // The Dashboard components will reset their internal state via the isSimulating prop changing
+  };
+
 
   const handleAdaptiveUpdate = useCallback((metrics: SimulationMetrics) => {
     setAdaptiveMetrics(metrics);
@@ -27,18 +36,23 @@ export default function ComparisonDashboard() {
 
   return (
     <div className="space-y-8">
-      <Tabs defaultValue="adaptive" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="adaptive">Adaptive Control</TabsTrigger>
-          <TabsTrigger value="fixed">Fixed Time</TabsTrigger>
-        </TabsList>
-        <TabsContent value="adaptive">
-          <Dashboard mode="adaptive" onMetricsUpdate={handleAdaptiveUpdate} />
-        </TabsContent>
-        <TabsContent value="fixed">
-          <Dashboard mode="fixed" onMetricsUpdate={handleFixedUpdate} />
-        </TabsContent>
-      </Tabs>
+       <DashboardControls
+        isSimulating={isSimulating}
+        onStart={handleStart}
+        onStop={handleStop}
+        onReset={handleReset}
+      />
+      
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+        <div className="space-y-4">
+            <h2 className="text-2xl font-bold text-center">Adaptive Control</h2>
+            <Dashboard mode="adaptive" onMetricsUpdate={handleAdaptiveUpdate} isSimulating={isSimulating} />
+        </div>
+        <div className="space-y-4">
+            <h2 className="text-2xl font-bold text-center">Fixed Time</h2>
+            <Dashboard mode="fixed" onMetricsUpdate={handleFixedUpdate} isSimulating={isSimulating} />
+        </div>
+      </div>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

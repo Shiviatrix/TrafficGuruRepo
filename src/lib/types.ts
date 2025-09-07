@@ -35,4 +35,5 @@ export interface SimulationMetrics {
 export interface DashboardProps {
   mode: 'adaptive' | 'fixed';
   onMetricsUpdate?: (metrics: SimulationMetrics) => void;
+  isSimulating: boolean;
 }

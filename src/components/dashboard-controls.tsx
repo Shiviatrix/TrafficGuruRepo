@@ -17,7 +17,7 @@ export function DashboardControls({
   onReset,
 }: DashboardControlsProps) {
   return (
-    <div className="flex justify-center items-center gap-4 mb-8">
+    <div className="flex justify-center items-center gap-4 my-8">
       {!isSimulating ? (
         <Button onClick={onStart} size="lg" className="w-36 bg-accent text-accent-foreground hover:bg-accent/90">
           <Play className="mr-2" /> Start
