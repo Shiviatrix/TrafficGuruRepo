@@ -16,7 +16,6 @@ const simStateReducer = (state: SimulationState, action: SimAction) => ({ ...sta
 
 export default function ComparisonDashboard() {
   const [isSimulating, setIsSimulating] = useState(false);
-  const [isFastForwarding, setIsFastForwarding] = useState(false);
   
   const { toast } = useToast();
 
@@ -29,45 +28,9 @@ export default function ComparisonDashboard() {
   
   const handleReset = useCallback(() => {
     setIsSimulating(false);
-    setIsFastForwarding(false);
     dispatchAdaptive({ type: 'UPDATE', payload: {...CONSTANTS.INITIAL_SIMULATION_STATE, mode: 'adaptive'} });
     dispatchFixed({ type: 'UPDATE', payload: {...CONSTANTS.INITIAL_SIMULATION_STATE, mode: 'fixed'} });
   }, []);
-
-  const runFastForward = async () => {
-    setIsFastForwarding(true);
-    let currentAdaptiveState = adaptiveState.cycleCount > 0 ? adaptiveState : {...CONSTANTS.INITIAL_SIMULATION_STATE, mode: 'adaptive'};
-    let currentFixedState = fixedState.cycleCount > 0 ? fixedState : {...CONSTANTS.INITIAL_SIMULATION_STATE, mode: 'fixed'};
-
-    try {
-      const FAST_FORWARD_CYCLES = 100;
-      for (let i = 0; i < FAST_FORWARD_CYCLES * 2; i++) { // x2 because each "cycle" is one phase change
-        // Pass `false` to disable explanation generation
-        currentAdaptiveState = await runSimulationCycle(currentAdaptiveState, false); 
-        currentFixedState = await runSimulationCycle(currentFixedState, false);
-        
-        // Update UI only periodically to avoid freezing the browser
-        if (i % 20 === 0) {
-            dispatchAdaptive({ type: 'UPDATE', payload: currentAdaptiveState });
-            dispatchFixed({ type: 'UPDATE', payload: currentFixedState });
-        }
-      }
-      
-      dispatchAdaptive({ type: 'UPDATE', payload: currentAdaptiveState });
-      dispatchFixed({ type: 'UPDATE', payload: currentFixedState });
-
-    } catch (error) {
-        console.error("Fast-forward simulation failed:", error);
-        toast({
-          variant: "destructive",
-          title: "Simulation Error",
-          description: "An error occurred during the fast-forward simulation.",
-          icon: <ServerCrash />,
-        })
-    } finally {
-      setIsFastForwarding(false);
-    }
-  };
 
   const totalCycles = Math.max(adaptiveState.metrics.cycleCount, fixedState.metrics.cycleCount);
   const efficiencyGain = fixedState.metrics.totalVehicles > 0
@@ -78,11 +41,9 @@ export default function ComparisonDashboard() {
     <div className="space-y-8">
        <DashboardControls
         isSimulating={isSimulating}
-        isFastForwarding={isFastForwarding}
         onStart={handleStart}
         onStop={handleStop}
         onReset={handleReset}
-        onFastForward={runFastForward}
       />
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
@@ -90,7 +51,6 @@ export default function ComparisonDashboard() {
             <h2 className="text-2xl font-bold text-center">Adaptive Control</h2>
             <Dashboard 
               isSimulating={isSimulating}
-              isFastForwarding={isFastForwarding} 
               currentState={adaptiveState} 
               dispatch={dispatchAdaptive}
              />
@@ -99,7 +59,6 @@ export default function ComparisonDashboard() {
             <h2 className="text-2xl font-bold text-center">Fixed Time</h2>
              <Dashboard 
               isSimulating={isSimulating}
-              isFastForwarding={isFastForwarding} 
               currentState={fixedState}
               dispatch={dispatchFixed}
              />

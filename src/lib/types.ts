@@ -51,7 +51,6 @@ export interface SimulationState {
 
 export interface DashboardProps {
   isSimulating: boolean;
-  isFastForwarding: boolean;
   currentState: SimulationState;
   dispatch: React.Dispatch<{ type: 'UPDATE'; payload: Partial<SimulationState> }>;
 }

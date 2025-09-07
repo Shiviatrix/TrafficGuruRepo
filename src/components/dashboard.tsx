@@ -9,12 +9,10 @@ import { runSimulationCycle } from '@/lib/simulation-runner';
 import { ServerCrash } from 'lucide-react';
 
 
-export default function Dashboard({ isSimulating, isFastForwarding, currentState, dispatch }: DashboardProps) {
+export default function Dashboard({ isSimulating, currentState, dispatch }: DashboardProps) {
   const cycleTimeout = useRef<NodeJS.Timeout | null>(null);
   const uiInterval = useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
-  
-  const isRunning = isSimulating && !isFastForwarding;
 
   useEffect(() => {
     // Stop all timers and intervals when the component unmounts or simulation stops
@@ -25,12 +23,12 @@ export default function Dashboard({ isSimulating, isFastForwarding, currentState
   }, []);
 
   useEffect(() => {
-    if (isRunning && currentState.cycleCount === 0) {
+    if (isSimulating && currentState.cycleCount === 0) {
       // If simulation starts from a reset state, trigger the first cycle immediately
       runCycle();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isRunning, currentState.cycleCount]);
+  }, [isSimulating, currentState.cycleCount]);
 
 
   const runCycle = async () => {
@@ -52,7 +50,7 @@ export default function Dashboard({ isSimulating, isFastForwarding, currentState
   };
   
   useEffect(() => {
-    if (!isRunning) {
+    if (!isSimulating) {
         if (cycleTimeout.current) clearTimeout(cycleTimeout.current);
         if (uiInterval.current) clearInterval(uiInterval.current);
         return;
@@ -73,7 +71,7 @@ export default function Dashboard({ isSimulating, isFastForwarding, currentState
       if (uiInterval.current) clearInterval(uiInterval.current);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isRunning, currentState.cycleCount, currentState.phase]); // Rerun effect when state changes
+  }, [isSimulating, currentState.cycleCount, currentState.phase]); // Rerun effect when state changes
 
 
   const { nsTimer, nsProgress, ewTimer, ewProgress, nsDelta, ewDelta, nsExplanation, ewExplanation } = useMemo(() => {
