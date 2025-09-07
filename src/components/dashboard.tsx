@@ -63,6 +63,7 @@ export default function Dashboard({ mode, onMetricsUpdate, isSimulating }: Dashb
       let delta = 0;
       let ns_green_s = CONSTANTS.BASE_GREEN_S;
       let ew_green_s = CONSTANTS.BASE_GREEN_S;
+      let explanation = 'Fixed time cycle. No AI intervention.';
 
       if (mode === 'adaptive') {
         // 3. Calculate Delta for the *next* active group
@@ -88,32 +89,34 @@ export default function Dashboard({ mode, onMetricsUpdate, isSimulating }: Dashb
         const adjustment = nextActiveGroupName === 'NS' ? delta : -delta;
         ns_green_s += adjustment;
         ew_green_s -= adjustment;
-      }
 
+        // 5. Get AI explanation
+        const explanationInput: ExplainDecisionReasoningInput = {
+          group: nextActiveGroupName,
+          ns_green_s,
+          ew_green_s,
+          delta_used_s: delta,
+          ns_queue: evolvedGroups.NS.queue,
+          ew_queue: evolvedGroups.EW.queue,
+          ns_count: evolvedGroups.NS.count,
+          ew_count: evolvedGroups.EW.count,
+          ns_mean: evolvedGroups.NS.mean,
+          ew_mean: evolvedGroups.EW.mean,
+          ns_weight: evolvedGroups.NS.weight,
+          ew_weight: evolvedGroups.EW.weight,
+          ns_emergency: evolvedGroups.NS.emergency,
+          ew_emergency: evolvedGroups.EW.emergency,
+        };
+        const { explanation: aiExplanation } = await explainDecisionReasoning(explanationInput);
+        explanation = aiExplanation;
+      }
+      
       const min_ns = evolvedGroups.NS.emergency ? CONSTANTS.MIN_GREEN_EMERG_S : CONSTANTS.MIN_GREEN_BASE_S;
       const min_ew = evolvedGroups.EW.emergency ? CONSTANTS.MIN_GREEN_EMERG_S : CONSTANTS.MIN_GREEN_BASE_S;
       ns_green_s = Math.max(min_ns, ns_green_s);
       ew_green_s = Math.max(min_ew, ew_green_s);
 
 
-      // 5. Get AI explanation
-      const explanationInput: ExplainDecisionReasoningInput = {
-        group: nextActiveGroupName,
-        ns_green_s,
-        ew_green_s,
-        delta_used_s: delta,
-        ns_queue: evolvedGroups.NS.queue,
-        ew_queue: evolvedGroups.EW.queue,
-        ns_count: evolvedGroups.NS.count,
-        ew_count: evolvedGroups.EW.count,
-        ns_mean: evolvedGroups.NS.mean,
-        ew_mean: evolvedGroups.EW.mean,
-        ns_weight: evolvedGroups.NS.weight,
-        ew_weight: evolvedGroups.EW.weight,
-        ns_emergency: evolvedGroups.NS.emergency,
-        ew_emergency: evolvedGroups.EW.emergency,
-      };
-      const { explanation } = await explainDecisionReasoning(explanationInput);
       
       // 6. Update state for next cycle
       const nextCycleDuration = nextActiveGroupName === 'NS' ? ns_green_s : ew_green_s;
@@ -197,7 +200,8 @@ export default function Dashboard({ mode, onMetricsUpdate, isSimulating }: Dashb
           progress={simState.activeGroup === 'NS' ? simState.progress : 100}
           sensorData={simState.groups.NS}
           delta={mode === 'adaptive' && simState.activeGroup === 'NS' ? simState.delta_used_s : undefined}
-          explanation={isSimulating ? simState.explanation : 'Waiting for phase...'}
+          explanation={mode === 'adaptive' && isSimulating ? simState.explanation : 'Waiting for phase...'}
+          showExplanation={mode === 'adaptive'}
         />
         <TrafficCard
           title="East-West"
@@ -206,7 +210,8 @@ export default function Dashboard({ mode, onMetricsUpdate, isSimulating }: Dashb
           progress={simState.activeGroup === 'EW' ? simState.progress : 100}
           sensorData={simState.groups.EW}
           delta={mode === 'adaptive' && simState.activeGroup === 'EW' ? simState.delta_used_s : undefined}
-          explanation={isSimulating ? simState.explanation : 'Waiting for phase...'}
+          explanation={mode === 'adaptive' && isSimulating ? simState.explanation : 'Waiting for phase...'}
+          showExplanation={mode === 'adaptive'}
         />
       </div>
     </div>

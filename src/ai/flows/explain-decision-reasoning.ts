@@ -48,34 +48,17 @@ const prompt = ai.definePrompt({
   name: 'explainDecisionReasoningPrompt',
   input: {schema: ExplainDecisionReasoningInputSchema},
   output: {schema: ExplainDecisionReasoningOutputSchema},
-  prompt: `You are a traffic management expert explaining the reasoning behind traffic light duration decisions.
+  prompt: `You are a traffic AI. Provide a concise, one-sentence explanation for the green light decision for the {{group}} direction.
 
-  Based on the provided information, explain why the green light duration was chosen for the given traffic group.
-  When an emergency is detected, mention that sound sensors picked up the siren frequency.
-  Consider the following factors:
-  - Emergency vehicles (sensed by sound sensors)
-  - Queue length
-  - Vehicle arrival rate (count)
-  - Vehicle type weights
-  - Delta value
+If an emergency is active (e.g., {{#if ns_emergency}}NS emergency{{/if}}{{#if ew_emergency}}EW emergency{{/if}}), mention it was detected by sound sensors picking up siren frequencies.
+Prioritize the most impactful factor: emergency, then queue length, then vehicle weight/type.
 
-  Data:
-  Group: {{group}}
-  NS Green Time: {{ns_green_s}} seconds
-  EW Green Time: {{ew_green_s}} seconds
-  Delta Used: {{delta_used_s}} seconds
-  NS Queue: {{ns_queue}}
-  EW Queue: {{ew_queue}}
-  NS Count: {{ns_count}}
-  EW Count: {{ew_count}}
-  NS Mean: {{ns_mean}}
-  EW Mean: {{ew_mean}}
-  NS Weight: {{ns_weight}}
-  EW Weight: {{ew_weight}}
-  NS Emergency: {{ns_emergency}}
-  EW Emergency: {{ew_emergency}}
-
-  Explanation:`,
+Data:
+Group: {{group}}
+Green Time: {{#if (eq group "NS")}}{{ns_green_s}}{{else}}{{ew_green_s}}{{/if}}s (Δ: {{delta_used_s}}s)
+NS Queue: {{ns_queue}}, EW Queue: {{ew_queue}}
+NS Emergency: {{ns_emergency}}, EW Emergency: {{ew_emergency}}
+`,
 });
 
 const explainDecisionReasoningFlow = ai.defineFlow(
