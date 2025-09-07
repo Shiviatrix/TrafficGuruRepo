@@ -8,23 +8,10 @@ export interface SensorData {
 
 export type TrafficLightStatus = 'GREEN' | 'RED' | 'YELLOW';
 
-export interface SimulationState {
-  isSimulating: boolean;
+export interface SimulationMetrics {
+  totalVehicles: number;
   cycleCount: number;
-  activeGroup: 'NS' | 'EW';
-  phase: 'GREEN' | 'YELLOW';
-  ns_status: TrafficLightStatus;
-  ew_status: TrafficLightStatus;
-  ns_green_s: number;
-  ew_green_s: number;
-  timer: number;
-  progress: number;
-  delta_used_s: number;
-  explanation: string;
-  groups: {
-    NS: SensorData;
-    EW: SensorData;
-  };
+  emergencyVehicles: number;
 }
 
 export interface VehicleThroughput {
@@ -37,14 +24,34 @@ export interface EmergencyVehicleThroughput {
   EW: number;
 }
 
-export interface SimulationMetrics {
-  totalVehicles: number;
+
+export interface SimulationState {
+  mode: 'adaptive' | 'fixed';
   cycleCount: number;
-  emergencyVehicles: number;
+  activeGroup: 'NS' | 'EW';
+  phase: 'GREEN' | 'YELLOW';
+  ns_status: TrafficLightStatus;
+  ew_status: TrafficLightStatus;
+  ns_green_s: number;
+  ew_green_s: number;
+  timer: number;
+  delta_used_s: number;
+  explanation: string;
+  groups: {
+    NS: SensorData;
+    EW: SensorData;
+  };
+  // Internal state for metrics calculation
+  throughput: VehicleThroughput;
+  emergencyThroughput: EmergencyVehicleThroughput;
+  // Published metrics for UI
+  metrics: SimulationMetrics;
 }
 
+
 export interface DashboardProps {
-  mode: 'adaptive' | 'fixed';
-  onMetricsUpdate?: (metrics: SimulationMetrics) => void;
   isSimulating: boolean;
+  isFastForwarding: boolean;
+  currentState: SimulationState;
+  dispatch: React.Dispatch<{ type: 'UPDATE'; payload: Partial<SimulationState> }>;
 }

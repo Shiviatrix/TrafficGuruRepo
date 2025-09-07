@@ -1,261 +1,127 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import { TrafficCard } from '@/components/traffic-card';
 import * as CONSTANTS from '@/lib/constants';
-import type { SimulationState, DashboardProps, VehicleThroughput, EmergencyVehicleThroughput } from '@/lib/types';
-import { calculateDelta, type CalculateDeltaInput } from '@/ai/flows/calculate-delta';
-import { explainDecisionReasoning, type ExplainDecisionReasoningInput } from '@/ai/flows/explain-decision-reasoning';
+import type { DashboardProps, SimulationState } from '@/lib/types';
 import { useToast } from "@/hooks/use-toast"
+import { runSimulationCycle } from '@/lib/simulation-runner';
+import { ServerCrash } from 'lucide-react';
 
-export default function Dashboard({ mode, onMetricsUpdate, isSimulating }: DashboardProps) {
-  const [simState, setSimState] = useState<SimulationState>({...CONSTANTS.INITIAL_SIMULATION_STATE});
+
+export default function Dashboard({ isSimulating, isFastForwarding, currentState, dispatch }: DashboardProps) {
   const cycleTimeout = useRef<NodeJS.Timeout | null>(null);
   const uiInterval = useRef<NodeJS.Timeout | null>(null);
-  const throughput = useRef<VehicleThroughput>({ NS: 0, EW: 0 });
-  const emergencyThroughput = useRef<EmergencyVehicleThroughput>({ NS: 0, EW: 0 });
   const { toast } = useToast();
+  
+  const isRunning = isSimulating && !isFastForwarding;
 
-  const handleReset = () => {
-    throughput.current = { NS: 0, EW: 0 };
-    emergencyThroughput.current = { NS: 0, EW: 0 };
-    setSimState(CONSTANTS.INITIAL_SIMULATION_STATE)
-    if (onMetricsUpdate) {
-      onMetricsUpdate({
-        totalVehicles: 0,
-        cycleCount: 0,
-        emergencyVehicles: 0,
-      });
+  useEffect(() => {
+    // Stop all timers and intervals when the component unmounts or simulation stops
+    return () => {
+      if (cycleTimeout.current) clearTimeout(cycleTimeout.current);
+      if (uiInterval.current) clearInterval(uiInterval.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isRunning && currentState.cycleCount === 0) {
+      // If simulation starts from a reset state, trigger the first cycle immediately
+      runCycle();
     }
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isRunning, currentState.cycleCount]);
 
-  const runSimulationCycle = async (currentState: SimulationState) => {
-    try {
-      if (currentState.phase === 'GREEN') {
-        // === GREEN to YELLOW transition ===
-        const prevActiveGroupName = currentState.activeGroup;
-        const prevCycleDuration = prevActiveGroupName === 'NS' ? currentState.ns_green_s : currentState.ew_green_s;
-  
-        const evolvedGroups = JSON.parse(JSON.stringify(currentState.groups));
-  
-        // Evolve both groups based on green light duration
-        for (const groupName of ['NS', 'EW'] as const) {
-            const group = evolvedGroups[groupName];
-            const isGreen = groupName === prevActiveGroupName;
-            const duration = isGreen ? prevCycleDuration : CONSTANTS.YELLOW_S + prevCycleDuration;
 
-            if (isGreen) {
-                const dischargedVehicles = Math.max(0, (duration - CONSTANTS.STARTUP_LOST_S) * (CONSTANTS.LANES_PER_APPROACH / CONSTANTS.HEADWAY_S));
-                throughput.current[groupName] += dischargedVehicles;
-                group.queue = Math.max(0, group.queue - dischargedVehicles);
-
-                if (group.emergency) {
-                  emergencyThroughput.current[groupName] += 1;
-                }
-            }
-            group.queue += (group.count / 60) * duration;
-        }
-
-        setSimState({
-          ...currentState,
-          phase: 'YELLOW',
-          timer: CONSTANTS.YELLOW_S,
-          progress: 100,
-          ns_status: prevActiveGroupName === 'NS' ? 'YELLOW' : 'RED',
-          ew_status: prevActiveGroupName === 'EW' ? 'YELLOW' : 'RED',
-          groups: evolvedGroups,
-        });
-
-      } else {
-        // === YELLOW to GREEN transition ===
-        const prevActiveGroupName = currentState.activeGroup;
-        const nextActiveGroupName = prevActiveGroupName === 'NS' ? 'EW' : 'NS';
-  
-        const evolvedGroups = JSON.parse(JSON.stringify(currentState.groups));
-
-        // Evolve all groups' properties (random walk)
-        for (const groupName of ['NS', 'EW'] as const) {
-          const group = evolvedGroups[groupName];
-          const jitter = (val: number, jitterAmount: number) => val * (1 + (Math.random() - 0.5) * 2 * jitterAmount);
-          
-          group.count = jitter(group.count, CONSTANTS.ARRIVAL_JITTER);
-          group.weight = jitter(group.weight, CONSTANTS.WEIGHT_JITTER);
-          group.mean = group.mean * (1 - CONSTANTS.MEAN_UPDATE_FACTOR) + group.queue * CONSTANTS.MEAN_UPDATE_FACTOR;
-  
-          if (group.emergency && Math.random() < CONSTANTS.EMERG_DECAY_P) group.emergency = false;
-          if (!group.emergency && Math.random() < CONSTANTS.EMERG_SPAWN_P) group.emergency = true;
-        }
-  
-        let delta = 0;
-        let ns_green_s = CONSTANTS.BASE_GREEN_S;
-        let ew_green_s = CONSTANTS.BASE_GREEN_S;
-        let explanation = 'Fixed time cycle. No AI intervention.';
-  
-        if (mode === 'adaptive') {
-          const groupToAdjust = evolvedGroups[nextActiveGroupName];
-          const otherGroup = evolvedGroups[prevActiveGroupName];
-          const avg_mean = (groupToAdjust.mean + otherGroup.mean) / 2;
-          const avg_weight = (groupToAdjust.weight + otherGroup.weight) / 2;
-  
-          const deltaInput: CalculateDeltaInput = {
-            emergencyBonus: groupToAdjust.emergency ? CONSTANTS.EMERGENCY_BONUS_S : 0,
-            meanDemand: groupToAdjust.mean,
-            avgMean: avg_mean,
-            weightIndex: groupToAdjust.weight,
-            avgWeight: avg_weight,
-            alpha: CONSTANTS.ALPHA_PER_MEAN,
-            beta: CONSTANTS.BETA_PER_WEIGHT,
-            maxAdjust: CONSTANTS.MAX_ADJUST_S,
-          };
-          const { delta: calculatedDelta } = await calculateDelta(deltaInput);
-          delta = calculatedDelta;
-          
-          const adjustment = nextActiveGroupName === 'NS' ? delta : -delta;
-          ns_green_s += adjustment;
-          ew_green_s -= adjustment;
-  
-          const explanationInput: ExplainDecisionReasoningInput = {
-            group: nextActiveGroupName,
-            ns_green_s,
-            ew_green_s,
-            delta_used_s: delta,
-            ns_queue: evolvedGroups.NS.queue,
-            ew_queue: evolvedGroups.EW.queue,
-            ns_count: evolvedGroups.NS.count,
-            ew_count: evolvedGroups.EW.count,
-            ns_mean: evolvedGroups.NS.mean,
-            ew_mean: evolvedGroups.EW.mean,
-            ns_weight: evolvedGroups.NS.weight,
-            ew_weight: evolvedGroups.EW.weight,
-            ns_emergency: evolvedGroups.NS.emergency,
-            ew_emergency: evolvedGroups.EW.emergency,
-          };
-          const { explanation: aiExplanation } = await explainDecisionReasoning(explanationInput);
-          explanation = aiExplanation;
-        }
-        
-        const min_ns = evolvedGroups.NS.emergency ? CONSTANTS.MIN_GREEN_EMERG_S : CONSTANTS.MIN_GREEN_BASE_S;
-        const min_ew = evolvedGroups.EW.emergency ? CONSTANTS.MIN_GREEN_EMERG_S : CONSTANTS.MIN_GREEN_BASE_S;
-        ns_green_s = Math.max(min_ns, ns_green_s);
-        ew_green_s = Math.max(min_ew, ew_green_s);
-  
-        const nextCycleDuration = nextActiveGroupName === 'NS' ? ns_green_s : ew_green_s;
-        
-        setSimState({
-          ...currentState,
-          cycleCount: currentState.cycleCount + 1,
-          activeGroup: nextActiveGroupName,
-          phase: 'GREEN',
-          ns_status: nextActiveGroupName === 'NS' ? 'GREEN' : 'RED',
-          ew_status: nextActiveGroupName === 'EW' ? 'GREEN' : 'RED',
-          groups: evolvedGroups,
-          ns_green_s,
-          ew_green_s,
-          delta_used_s: delta,
-          timer: nextCycleDuration,
-          progress: 100,
-          explanation,
-        });
-  
-        if (onMetricsUpdate) {
-          onMetricsUpdate({
-            totalVehicles: throughput.current.NS + throughput.current.EW,
-            cycleCount: currentState.cycleCount + 1,
-            emergencyVehicles: emergencyThroughput.current.NS + emergencyThroughput.current.EW,
-          });
-        }
-      }
-
-    } catch (error) {
-        console.error("Simulation cycle failed:", error);
+  const runCycle = async () => {
+      try {
+        const nextState = await runSimulationCycle(currentState);
+        dispatch({ type: 'UPDATE', payload: nextState });
+      } catch (error) {
+        console.error(`Simulation cycle failed for mode: ${currentState.mode}`, error);
         toast({
           variant: "destructive",
           title: "Simulation Error",
           description: "An error occurred during the simulation cycle. Check the console for details.",
+          icon: <ServerCrash />
         })
+        // Stop simulation on error
         if (cycleTimeout.current) clearTimeout(cycleTimeout.current);
         if (uiInterval.current) clearInterval(uiInterval.current);
-    }
+      }
   };
-
+  
   useEffect(() => {
-    if (isSimulating) {
-      // Main simulation cycle trigger
-      const cycleDurationMs = simState.timer * 1000;
-      cycleTimeout.current = setTimeout(() => runSimulationCycle(simState), cycleDurationMs > 0 ? cycleDurationMs : 1000);
-      
-      // UI countdown timer
-      uiInterval.current = setInterval(() => {
-        setSimState(s => {
-          if (!isSimulating) return s;
-          const newTime = s.timer - (CONSTANTS.UI_UPDATE_INTERVAL_MS / 1000);
-          
-          let cycleDuration = 0;
-          if (s.phase === 'GREEN') {
-            cycleDuration = s.activeGroup === 'NS' ? s.ns_green_s : s.ew_green_s;
-          } else {
-            cycleDuration = CONSTANTS.YELLOW_S;
-          }
-
-          return {
-            ...s,
-            timer: Math.max(0, newTime),
-            progress: (newTime / cycleDuration) * 100,
-          };
-        });
-      }, CONSTANTS.UI_UPDATE_INTERVAL_MS);
-
-    } else {
+    if (!isRunning) {
         if (cycleTimeout.current) clearTimeout(cycleTimeout.current);
         if (uiInterval.current) clearInterval(uiInterval.current);
-        // Reset if simulation is stopped
-        if (simState.cycleCount > 0) {
-            handleReset();
-        }
+        return;
     }
+    
+    // Main simulation cycle trigger
+    const cycleDurationMs = currentState.timer * 1000;
+    cycleTimeout.current = setTimeout(runCycle, cycleDurationMs > 0 ? cycleDurationMs : 100);
+
+    // UI countdown timer
+    uiInterval.current = setInterval(() => {
+      dispatch({ type: 'UPDATE', payload: { timer: Math.max(0, currentState.timer - (CONSTANTS.UI_UPDATE_INTERVAL_MS / 1000)) } });
+    }, CONSTANTS.UI_UPDATE_INTERVAL_MS);
+
 
     return () => {
       if (cycleTimeout.current) clearTimeout(cycleTimeout.current);
       if (uiInterval.current) clearInterval(uiInterval.current);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isSimulating, simState.cycleCount, simState.phase]);
+  }, [isRunning, currentState.cycleCount, currentState.phase]); // Rerun effect when state changes
 
 
-  const getTimerForGroup = (group: 'NS' | 'EW') => {
-    if (simState.phase === 'GREEN' && simState.activeGroup === group) return simState.timer;
-    if (simState.phase === 'YELLOW' && simState.activeGroup === group) return simState.timer;
-    return simState.activeGroup === group ? (group === 'NS' ? simState.ns_green_s : simState.ew_green_s) : (group === 'NS' ? simState.ns_green_s : simState.ew_green_s);
-  };
-  
-  const getProgressForGroup = (group: 'NS' | 'EW') => {
-      if (simState.phase === 'GREEN' && simState.activeGroup === group) return simState.progress;
-      if (simState.phase === 'YELLOW' && simState.activeGroup === group) return simState.progress;
-      return 100;
-  };
+  const { nsTimer, nsProgress, ewTimer, ewProgress, nsDelta, ewDelta, nsExplanation, ewExplanation } = useMemo(() => {
+    const { phase, activeGroup, ns_green_s, ew_green_s, timer, delta_used_s, explanation, mode } = currentState;
+    const isAdaptive = mode === 'adaptive';
+    
+    let cycleDuration = phase === 'GREEN' ? (activeGroup === 'NS' ? ns_green_s : ew_green_s) : CONSTANTS.YELLOW_S;
+    if (cycleDuration <= 0) cycleDuration = 1; // Prevent division by zero
+    const currentProgress = (timer / cycleDuration) * 100;
+
+    const getTimer = (group: 'NS' | 'EW') => (activeGroup === group ? timer : (group === 'NS' ? ns_green_s : ew_green_s));
+    const getProgress = (group: 'NS' | 'EW') => (activeGroup === group ? currentProgress : 100);
+
+    return {
+        nsTimer: getTimer('NS'),
+        nsProgress: getProgress('NS'),
+        ewTimer: getTimer('EW'),
+        ewProgress: getProgress('EW'),
+        nsDelta: isAdaptive && activeGroup === 'NS' ? delta_used_s : undefined,
+        ewDelta: isAdaptive && activeGroup === 'EW' ? delta_used_s : undefined,
+        nsExplanation: isAdaptive && activeGroup === 'NS' && phase === 'GREEN' ? explanation : 'Waiting for phase...',
+        ewExplanation: isAdaptive && activeGroup === 'EW' && phase === 'GREEN' ? explanation : 'Waiting for phase...',
+    };
+  }, [currentState]);
+
 
   return (
     <div className="space-y-8">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         <TrafficCard
           title="North-South"
-          status={simState.ns_status}
-          timer={getTimerForGroup('NS')}
-          progress={getProgressForGroup('NS')}
-          sensorData={simState.groups.NS}
-          delta={mode === 'adaptive' && simState.activeGroup === 'NS' ? simState.delta_used_s : undefined}
-          explanation={mode === 'adaptive' && isSimulating && simState.activeGroup === 'NS' && simState.phase === 'GREEN' ? simState.explanation : 'Waiting for phase...'}
-          showExplanation={mode === 'adaptive'}
+          status={currentState.ns_status}
+          timer={nsTimer}
+          progress={nsProgress}
+          sensorData={currentState.groups.NS}
+          delta={nsDelta}
+          explanation={nsExplanation}
+          showExplanation={currentState.mode === 'adaptive'}
         />
         <TrafficCard
           title="East-West"
-          status={simState.ew_status}
-          timer={getTimerForGroup('EW')}
-          progress={getProgressForGroup('EW')}
-          sensorData={simState.groups.EW}
-          delta={mode === 'adaptive' && simState.activeGroup === 'EW' ? simState.delta_used_s : undefined}
-          explanation={mode === 'adaptive' && isSimulating && simState.activeGroup === 'EW' && simState.phase === 'GREEN' ? simState.explanation : 'Waiting for phase...'}
-          showExplanation={mode === 'adaptive'}
+          status={currentState.ew_status}
+          timer={ewTimer}
+          progress={ewProgress}
+          sensorData={currentState.groups.EW}
+          delta={ewDelta}
+          explanation={ewExplanation}
+          showExplanation={currentState.mode === 'adaptive'}
         />
       </div>
     </div>

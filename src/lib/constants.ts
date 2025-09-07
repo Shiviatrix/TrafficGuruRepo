@@ -7,7 +7,7 @@ export const MAX_ADJUST_S = 20;
 export const EMERGENCY_BONUS_S = 15;
 export const MIN_GREEN_BASE_S = 10;
 export const MIN_GREEN_EMERG_S = 7;
-export const UI_UPDATE_INTERVAL_MS = 200;
+export const UI_UPDATE_INTERVAL_MS = 100;
 
 // Delta calculation coefficients
 export const ALPHA_PER_MEAN = 1.0;
@@ -24,8 +24,7 @@ export const EMERG_SPAWN_P = 0.05; // 5% chance new emergency appears
 export const MEAN_UPDATE_FACTOR = 0.1; // Weight for new queue pressure in mean calculation
 
 // Initial state for the simulation, mimicking traffic_gen.py
-export const INITIAL_SIMULATION_STATE: SimulationState = {
-  isSimulating: false,
+export const INITIAL_SIMULATION_STATE: Omit<SimulationState, 'mode'> = {
   cycleCount: 0,
   activeGroup: 'EW',
   phase: 'GREEN',
@@ -34,7 +33,6 @@ export const INITIAL_SIMULATION_STATE: SimulationState = {
   ns_green_s: BASE_GREEN_S,
   ew_green_s: BASE_GREEN_S,
   timer: BASE_GREEN_S,
-  progress: 100,
   delta_used_s: 0,
   explanation: 'Simulation has not started. Press Start to begin.',
   groups: {
@@ -53,4 +51,11 @@ export const INITIAL_SIMULATION_STATE: SimulationState = {
       emergency: false,
     },
   },
+  metrics: {
+      totalVehicles: 0,
+      cycleCount: 0,
+      emergencyVehicles: 0,
+  },
+  throughput: { NS: 0, EW: 0 },
+  emergencyThroughput: { NS: 0, EW: 0 },
 };
