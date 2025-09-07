@@ -9,7 +9,7 @@ A Firebase-hosted web application built with TypeScript.
 ## 🛠️ Tech Stack
 - **TypeScript**
 - **Firebase Hosting**
-- *(React / Vue / Next.js if applicable)*
+- *Next.js*
 
 ---
 
