@@ -6,10 +6,15 @@ export interface SensorData {
   emergency: boolean;
 }
 
+export type TrafficLightStatus = 'GREEN' | 'RED' | 'YELLOW';
+
 export interface SimulationState {
   isSimulating: boolean;
   cycleCount: number;
   activeGroup: 'NS' | 'EW';
+  phase: 'GREEN' | 'YELLOW';
+  ns_status: TrafficLightStatus;
+  ew_status: TrafficLightStatus;
   ns_green_s: number;
   ew_green_s: number;
   timer: number;

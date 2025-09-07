@@ -5,11 +5,11 @@ import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { CarFront, Gauge, Siren, Truck, Users, Bot } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { SensorData } from '@/lib/types';
+import type { SensorData, TrafficLightStatus } from '@/lib/types';
 
 interface TrafficCardProps {
   title: string;
-  status: 'GREEN' | 'RED';
+  status: TrafficLightStatus;
   timer: number;
   progress: number;
   sensorData: SensorData;
@@ -30,14 +30,34 @@ const InfoItem = ({ icon: Icon, label, value }: { icon: React.ElementType, label
 
 export function TrafficCard({ title, status, timer, progress, sensorData, delta, explanation, showExplanation = true }: TrafficCardProps) {
   const isGreen = status === 'GREEN';
+  const isRed = status === 'RED';
+  const isYellow = status === 'YELLOW';
+
+  const cardClasses = cn("transition-all duration-300 flex flex-col", {
+    'border-accent shadow-lg shadow-accent/20': isGreen,
+    'border-destructive/50': isRed,
+    'border-yellow-500 shadow-lg shadow-yellow-500/20': isYellow,
+  });
+
+  const descriptionClasses = cn('font-semibold text-lg', {
+    'text-accent-foreground': isGreen,
+    'text-destructive': isRed,
+    'text-yellow-500': isYellow,
+  });
+
+  const progressClasses = cn('h-2 mt-2 [&>*]:transition-all [&>*]:duration-200', {
+    '[&>*]:bg-accent': isGreen,
+    '[&>*]:bg-destructive': isRed,
+    '[&>*]:bg-yellow-500': isYellow,
+  });
 
   return (
-    <Card className={cn("transition-all duration-300 flex flex-col", isGreen ? 'border-accent shadow-lg shadow-accent/20' : 'border-destructive/50')}>
+    <Card className={cardClasses}>
       <CardHeader>
         <div className="flex justify-between items-start">
           <div>
             <CardTitle className="text-2xl font-bold">{title}</CardTitle>
-            <CardDescription className={cn(isGreen ? 'text-accent-foreground' : 'text-destructive', 'font-semibold text-lg')}>
+            <CardDescription className={descriptionClasses}>
               {status}
             </CardDescription>
           </div>
@@ -52,7 +72,7 @@ export function TrafficCard({ title, status, timer, progress, sensorData, delta,
             )}
           </div>
         </div>
-        <Progress value={progress} className={cn('h-2 mt-2 [&>*]:transition-all [&>*]:duration-200', isGreen ? '[&>*]:bg-accent' : '[&>*]:bg-destructive')} />
+        <Progress value={progress} className={progressClasses} />
       </CardHeader>
       <CardContent className="space-y-3 flex-grow">
         <div className="flex justify-between items-center">

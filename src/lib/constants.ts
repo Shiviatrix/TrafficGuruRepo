@@ -2,6 +2,7 @@ import type { SimulationState } from './types';
 
 // Core simulation parameters
 export const BASE_GREEN_S = 40;
+export const YELLOW_S = 3;
 export const MAX_ADJUST_S = 15;
 export const EMERGENCY_BONUS_S = 10;
 export const MIN_GREEN_BASE_S = 10;
@@ -27,6 +28,9 @@ export const INITIAL_SIMULATION_STATE: SimulationState = {
   isSimulating: false,
   cycleCount: 0,
   activeGroup: 'EW',
+  phase: 'GREEN',
+  ns_status: 'RED',
+  ew_status: 'GREEN',
   ns_green_s: BASE_GREEN_S,
   ew_green_s: BASE_GREEN_S,
   timer: BASE_GREEN_S,
