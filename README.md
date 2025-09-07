@@ -1,5 +1,17 @@
-# Firebase Studio
+# 🚀 AdaptiveFlow Studio
 
-This is a NextJS starter in Firebase Studio.
+A Firebase-hosted web application built with TypeScript.
 
-To get started, take a look at src/app/page.tsx.
+🔗 **Live Demo:** [studio--adaptiveflow-oxefi.us-central1.hosted.app](https://studio--adaptiveflow-oxefi.us-central1.hosted.app/)
+
+---
+
+## 🛠️ Tech Stack
+- **TypeScript**
+- **Firebase Hosting**
+- *(React / Vue / Next.js if applicable)*
+
+---
+
+## 📄 License
+This project is licensed under the MIT License.
