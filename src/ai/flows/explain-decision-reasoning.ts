@@ -55,7 +55,7 @@ Prioritize the most impactful factor: emergency, then queue length, then vehicle
 
 Data:
 Group: {{group}}
-Green Time: {{#if (eq group "NS")}}{{ns_green_s}}{{else}}{{ew_green_s}}{{/if}}s (Δ: {{delta_used_s}}s)
+Green Time: {{green_time_s}}s (Δ: {{delta_used_s}}s)
 NS Queue: {{ns_queue}}, EW Queue: {{ew_queue}}
 NS Emergency: {{ns_emergency}}, EW Emergency: {{ew_emergency}}
 `,
@@ -68,7 +68,8 @@ const explainDecisionReasoningFlow = ai.defineFlow(
     outputSchema: ExplainDecisionReasoningOutputSchema,
   },
   async input => {
-    const {output} = await prompt(input);
+    const green_time_s = input.group === 'NS' ? input.ns_green_s : input.ew_green_s;
+    const {output} = await prompt({...input, green_time_s});
     return output!;
   }
 );
