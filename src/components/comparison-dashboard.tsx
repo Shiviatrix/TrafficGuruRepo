@@ -42,8 +42,9 @@ export default function ComparisonDashboard() {
     try {
       const FAST_FORWARD_CYCLES = 100;
       for (let i = 0; i < FAST_FORWARD_CYCLES * 2; i++) { // x2 because each "cycle" is one phase change
-        currentAdaptiveState = await runSimulationCycle(currentAdaptiveState);
-        currentFixedState = await runSimulationCycle(currentFixedState);
+        // Pass `false` to disable explanation generation
+        currentAdaptiveState = await runSimulationCycle(currentAdaptiveState, false); 
+        currentFixedState = await runSimulationCycle(currentFixedState, false);
         
         // Update UI only periodically to avoid freezing the browser
         if (i % 20 === 0) {

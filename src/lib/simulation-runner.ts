@@ -6,7 +6,7 @@ import * as CONSTANTS from '@/lib/constants';
 import type { SimulationState } from '@/lib/types';
 
 
-export async function runSimulationCycle(currentState: SimulationState): Promise<SimulationState> {
+export async function runSimulationCycle(currentState: SimulationState, generateExplanation = true): Promise<SimulationState> {
     const nextState: SimulationState = JSON.parse(JSON.stringify(currentState));
 
     if (currentState.phase === 'GREEN') {
@@ -82,25 +82,29 @@ export async function runSimulationCycle(currentState: SimulationState): Promise
           const adjustment = nextActiveGroupName === 'NS' ? delta : -delta;
           ns_green_s += adjustment;
           ew_green_s -= adjustment;
-  
-          const explanationInput: ExplainDecisionReasoningInput = {
-            group: nextActiveGroupName,
-            ns_green_s,
-            ew_green_s,
-            delta_used_s: delta,
-            ns_queue: nextState.groups.NS.queue,
-            ew_queue: nextState.groups.EW.queue,
-            ns_count: nextState.groups.NS.count,
-            ew_count: nextState.groups.EW.count,
-            ns_mean: nextState.groups.NS.mean,
-            ew_mean: nextState.groups.EW.mean,
-            ns_weight: nextState.groups.NS.weight,
-            ew_weight: nextState.groups.EW.weight,
-            ns_emergency: nextState.groups.NS.emergency,
-            ew_emergency: nextState.groups.EW.emergency,
-          };
-          const { explanation: aiExplanation } = await explainDecisionReasoning(explanationInput);
-          explanation = aiExplanation;
+
+          if (generateExplanation) {
+            const explanationInput: ExplainDecisionReasoningInput = {
+                group: nextActiveGroupName,
+                ns_green_s,
+                ew_green_s,
+                delta_used_s: delta,
+                ns_queue: nextState.groups.NS.queue,
+                ew_queue: nextState.groups.EW.queue,
+                ns_count: nextState.groups.NS.count,
+                ew_count: nextState.groups.EW.count,
+                ns_mean: nextState.groups.NS.mean,
+                ew_mean: nextState.groups.EW.mean,
+                ns_weight: nextState.groups.NS.weight,
+                ew_weight: nextState.groups.EW.weight,
+                ns_emergency: nextState.groups.NS.emergency,
+                ew_emergency: nextState.groups.EW.emergency,
+            };
+            const { explanation: aiExplanation } = await explainDecisionReasoning(explanationInput);
+            explanation = aiExplanation;
+          } else {
+            explanation = 'Calculating...';
+          }
         }
         
         const min_ns = nextState.groups.NS.emergency ? CONSTANTS.MIN_GREEN_EMERG_S : CONSTANTS.MIN_GREEN_BASE_S;
