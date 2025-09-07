@@ -45,8 +45,8 @@ export function TrafficCard({ title, status, timer, progress, sensorData, delta,
               {timer.toFixed(1)}s
             </div>
             {isGreen && typeof delta !== 'undefined' && (
-              <div className={cn('text-sm font-semibold', delta > 0 ? 'text-green-600' : 'text-red-600')}>
-                Δ {delta > 0 ? '+' : ''}{delta.toFixed(1)}s
+               <div className={cn('text-sm font-semibold', delta >= 0 ? 'text-green-500' : 'text-red-500')}>
+                Δ {delta >= 0 ? '+' : ''}{delta.toFixed(1)}s
               </div>
             )}
           </div>

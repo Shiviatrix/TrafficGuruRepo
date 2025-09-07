@@ -21,3 +21,18 @@ export interface SimulationState {
     EW: SensorData;
   };
 }
+
+export interface VehicleThroughput {
+  NS: number;
+  EW: number;
+}
+
+export interface SimulationMetrics {
+  totalVehicles: number;
+  cycleCount: number;
+}
+
+export interface DashboardProps {
+  mode: 'adaptive' | 'fixed';
+  onMetricsUpdate?: (metrics: SimulationMetrics) => void;
+}

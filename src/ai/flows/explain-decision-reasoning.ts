@@ -1,4 +1,3 @@
-// src/ai/flows/explain-decision-reasoning.ts
 'use server';
 
 /**
@@ -52,8 +51,9 @@ const prompt = ai.definePrompt({
   prompt: `You are a traffic management expert explaining the reasoning behind traffic light duration decisions.
 
   Based on the provided information, explain why the green light duration was chosen for the given traffic group.
+  When an emergency is detected, mention that sound sensors picked up the siren frequency.
   Consider the following factors:
-  - Emergency vehicles
+  - Emergency vehicles (sensed by sound sensors)
   - Queue length
   - Vehicle arrival rate (count)
   - Vehicle type weights

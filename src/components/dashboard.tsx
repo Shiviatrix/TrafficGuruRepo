@@ -4,15 +4,16 @@ import { useState, useEffect, useRef } from 'react';
 import { TrafficCard } from '@/components/traffic-card';
 import { DashboardControls } from '@/components/dashboard-controls';
 import * as CONSTANTS from '@/lib/constants';
-import type { SimulationState, SensorData } from '@/lib/types';
+import type { SimulationState, DashboardProps, VehicleThroughput } from '@/lib/types';
 import { calculateDelta, type CalculateDeltaInput } from '@/ai/flows/calculate-delta';
 import { explainDecisionReasoning, type ExplainDecisionReasoningInput } from '@/ai/flows/explain-decision-reasoning';
 import { useToast } from "@/hooks/use-toast"
 
-export default function Dashboard() {
+export default function Dashboard({ mode, onMetricsUpdate }: DashboardProps) {
   const [simState, setSimState] = useState<SimulationState>(CONSTANTS.INITIAL_SIMULATION_STATE);
   const cycleTimeout = useRef<NodeJS.Timeout | null>(null);
   const uiInterval = useRef<NodeJS.Timeout | null>(null);
+  const throughput = useRef<VehicleThroughput>({ NS: 0, EW: 0 });
   const { toast } = useToast();
 
   const runSimulationCycle = async (currentState: SimulationState) => {
@@ -29,9 +30,10 @@ export default function Dashboard() {
       const redGroup = evolvedGroups[nextActiveGroupName];
       redGroup.queue += (redGroup.count / 60) * prevCycleDuration;
 
-      // 2b. Evolve Green Group
+      // 2b. Evolve Green Group & track throughput
       const greenGroup = evolvedGroups[prevActiveGroupName];
       const dischargedVehicles = Math.max(0, (prevCycleDuration - CONSTANTS.STARTUP_LOST_S) * (CONSTANTS.LANES_PER_APPROACH / CONSTANTS.HEADWAY_S));
+      throughput.current[prevActiveGroupName] += dischargedVehicles;
       greenGroup.queue += (greenGroup.count / 60) * prevCycleDuration;
       greenGroup.queue = Math.max(0, greenGroup.queue - dischargedVehicles);
 
@@ -48,36 +50,41 @@ export default function Dashboard() {
         if (!group.emergency && Math.random() < CONSTANTS.EMERG_SPAWN_P) group.emergency = true;
       }
 
-      // 3. Calculate Delta for the *next* active group
-      const groupToAdjust = evolvedGroups[nextActiveGroupName];
-      const otherGroup = evolvedGroups[prevActiveGroupName];
-      const avg_mean = (groupToAdjust.mean + otherGroup.mean) / 2;
-      const avg_weight = (groupToAdjust.weight + otherGroup.weight) / 2;
-
-      const deltaInput: CalculateDeltaInput = {
-        emergencyBonus: groupToAdjust.emergency ? CONSTANTS.EMERGENCY_BONUS_S : 0,
-        meanDemand: groupToAdjust.mean,
-        avgMean: avg_mean,
-        weightIndex: groupToAdjust.weight,
-        avgWeight: avg_weight,
-        alpha: CONSTANTS.ALPHA_PER_MEAN,
-        beta: CONSTANTS.BETA_PER_WEIGHT,
-        maxAdjust: CONSTANTS.MAX_ADJUST_S,
-      };
-      const { delta } = await calculateDelta(deltaInput);
-
-      // 4. Calculate and clamp green times
+      let delta = 0;
       let ns_green_s = CONSTANTS.BASE_GREEN_S;
       let ew_green_s = CONSTANTS.BASE_GREEN_S;
-      
-      const adjustment = nextActiveGroupName === 'NS' ? delta : -delta;
-      ns_green_s += adjustment;
-      ew_green_s -= adjustment;
+
+      if (mode === 'adaptive') {
+        // 3. Calculate Delta for the *next* active group
+        const groupToAdjust = evolvedGroups[nextActiveGroupName];
+        const otherGroup = evolvedGroups[prevActiveGroupName];
+        const avg_mean = (groupToAdjust.mean + otherGroup.mean) / 2;
+        const avg_weight = (groupToAdjust.weight + otherGroup.weight) / 2;
+
+        const deltaInput: CalculateDeltaInput = {
+          emergencyBonus: groupToAdjust.emergency ? CONSTANTS.EMERGENCY_BONUS_S : 0,
+          meanDemand: groupToAdjust.mean,
+          avgMean: avg_mean,
+          weightIndex: groupToAdjust.weight,
+          avgWeight: avg_weight,
+          alpha: CONSTANTS.ALPHA_PER_MEAN,
+          beta: CONSTANTS.BETA_PER_WEIGHT,
+          maxAdjust: CONSTANTS.MAX_ADJUST_S,
+        };
+        const { delta: calculatedDelta } = await calculateDelta(deltaInput);
+        delta = calculatedDelta;
+        
+        // 4. Calculate and clamp green times
+        const adjustment = nextActiveGroupName === 'NS' ? delta : -delta;
+        ns_green_s += adjustment;
+        ew_green_s -= adjustment;
+      }
 
       const min_ns = evolvedGroups.NS.emergency ? CONSTANTS.MIN_GREEN_EMERG_S : CONSTANTS.MIN_GREEN_BASE_S;
       const min_ew = evolvedGroups.EW.emergency ? CONSTANTS.MIN_GREEN_EMERG_S : CONSTANTS.MIN_GREEN_BASE_S;
       ns_green_s = Math.max(min_ns, ns_green_s);
       ew_green_s = Math.max(min_ew, ew_green_s);
+
 
       // 5. Get AI explanation
       const explanationInput: ExplainDecisionReasoningInput = {
@@ -114,6 +121,14 @@ export default function Dashboard() {
         explanation,
       });
 
+      // 7. Report metrics
+      if (onMetricsUpdate) {
+        onMetricsUpdate({
+          totalVehicles: throughput.current.NS + throughput.current.EW,
+          cycleCount: currentState.cycleCount + 1,
+        });
+      }
+
     } catch (error) {
         console.error("Simulation cycle failed:", error);
         toast({
@@ -127,7 +142,16 @@ export default function Dashboard() {
 
   const handleStart = () => setSimState(s => ({ ...s, isSimulating: true }));
   const handleStop = () => setSimState(s => ({ ...s, isSimulating: false }));
-  const handleReset = () => setSimState(CONSTANTS.INITIAL_SIMULATION_STATE);
+  const handleReset = () => {
+    throughput.current = { NS: 0, EW: 0 };
+    setSimState(CONSTANTS.INITIAL_SIMULATION_STATE)
+    if (onMetricsUpdate) {
+      onMetricsUpdate({
+        totalVehicles: 0,
+        cycleCount: 0,
+      });
+    }
+  };
 
   useEffect(() => {
     if (simState.isSimulating) {
@@ -176,8 +200,8 @@ export default function Dashboard() {
           timer={simState.activeGroup === 'NS' ? simState.timer : simState.ns_green_s}
           progress={simState.activeGroup === 'NS' ? simState.progress : 100}
           sensorData={simState.groups.NS}
-          delta={simState.activeGroup === 'NS' ? simState.delta_used_s : undefined}
-          explanation={simState.activeGroup === 'NS' ? simState.explanation : 'Waiting for phase...'}
+          delta={mode === 'adaptive' && simState.activeGroup === 'NS' ? simState.delta_used_s : undefined}
+          explanation={simState.isSimulating && simState.activeGroup === 'NS' ? simState.explanation : 'Waiting for phase...'}
         />
         <TrafficCard
           title="East-West"
@@ -185,8 +209,8 @@ export default function Dashboard() {
           timer={simState.activeGroup === 'EW' ? simState.timer : simState.ew_green_s}
           progress={simState.activeGroup === 'EW' ? simState.progress : 100}
           sensorData={simState.groups.EW}
-          delta={simState.activeGroup === 'EW' ? simState.delta_used_s : undefined}
-          explanation={simState.activeGroup === 'EW' ? simState.explanation : 'Waiting for phase...'}
+          delta={mode === 'adaptive' && simState.activeGroup === 'EW' ? simState.delta_used_s : undefined}
+          explanation={simState.isSimulating && simState.activeGroup === 'EW' ? simState.explanation : 'Waiting for phase...'}
         />
       </div>
     </div>

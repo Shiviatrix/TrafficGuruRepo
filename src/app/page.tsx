@@ -1,4 +1,4 @@
-import Dashboard from '@/components/dashboard';
+import ComparisonDashboard from '@/components/comparison-dashboard';
 
 export default function Home() {
   return (
@@ -11,7 +11,7 @@ export default function Home() {
           Smart Adaptive Traffic Light Controller
         </p>
       </header>
-      <Dashboard />
+      <ComparisonDashboard />
     </main>
   );
 }
