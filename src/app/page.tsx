@@ -30,27 +30,24 @@ export default function Home() {
         <CardContent className="space-y-4 text-sm text-muted-foreground">
           <p>
             This simulation demonstrates an adaptive traffic control system that
-            dynamically adjusts signal timings based on real-time data. It
+            dynamically adjusts signal timings based on real-time data from a network of simulated IoT (Internet of Things) sensors. It
             compares its performance against a traditional fixed-time
-            controller. The system uses a variety of simulated IoT sensors to
+            controller. The system uses a variety of sensors to
             make intelligent decisions:
           </p>
           <ul className="list-none space-y-2 pl-2">
             <SensorListItem>
-              <strong>Inductive-Loop Vehicle Detectors:</strong> Simulated to
-              provide vehicle counts and queue lengths for each direction.
+              <strong>Inductive-Loop Vehicle Detectors (as Pressure Plates):</strong> These are simulated as loops of wire embedded in the road. When a vehicle drives over them, the metal in the vehicle changes the magnetic field, which is detected to provide vehicle counts and queue lengths.
             </SensorListItem>
             <SensorListItem>
-              <strong>Acoustic Sensors:</strong> Detect siren frequencies to
-              identify and prioritize emergency vehicles.
+              <strong>Acoustic Sensors:</strong> These sensors are equipped with microphones tuned to detect the specific frequency patterns of emergency vehicle sirens. This allows the system to grant immediate priority to fire trucks, ambulances, and police cars.
             </SensorListItem>
             <SensorListItem>
               <strong>AI-Powered Cameras:</strong> Used to classify vehicle types (e.g., trucks, buses), which are assigned different "weights" to influence green light duration.
             </SensorListItem>
           </ul>
           <p>
-            An AI model calculates the optimal green light duration each cycle
-            to maximize traffic throughput and reduce congestion.
+            An AI model uses this combined sensor data to calculate the optimal green light duration for each cycle, aiming to maximize traffic throughput and reduce congestion.
           </p>
         </CardContent>
       </Card>
