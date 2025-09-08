@@ -1,4 +1,6 @@
 # Traffic Guru: Smart Traffic Management Simulation
+Where it's hosted:
+https://studio--adaptiveflow-oxefi.us-central1.hosted.app
 
 Traffic guru is a web-based simulation that demonstrates a modern, AI-powered traffic control system. It provides a real-time comparison between a traditional fixed-time traffic light controller and an adaptive system that dynamically adjusts signal timings based on live IoT sensor data.
 
